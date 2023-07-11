@@ -1,0 +1,2 @@
+This directory now contains the actual mechglue plugin,
+client functions have been moved to the client directory.

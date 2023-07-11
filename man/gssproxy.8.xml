@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>GssProxy Manual pages</title>
+<refentry>
+    <refentryinfo>
+        <productname>GSS Proxy</productname>
+        <orgname>GSS-Proxy - http://fedorahosted.org/gss-proxy</orgname>
+    </refentryinfo>
+
+    <refmeta>
+        <refentrytitle>gssproxy</refentrytitle>
+        <manvolnum>8</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>gssproxy</refname>
+        <refpurpose>GssProxy Daemon</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv id='synopsis'>
+        <cmdsynopsis>
+            <command>gssproxy</command>
+            <arg choice='opt'>
+                <replaceable>options</replaceable>
+            </arg>
+        </cmdsynopsis>
+    </refsynopsisdiv>
+
+    <refsect1 id='description'>
+        <title>DESCRIPTION</title>
+        <para>
+            <command>gssproxy</command> provides a daemon to manage access to
+            GSSAPI credentials.
+        </para>
+        <para>
+            <command>gssproxy</command> consists of the <command>gssproxy</command> daemon
+            (configured by the <citerefentry><refentrytitle>gssproxy.conf</refentrytitle>
+            <manvolnum>5</manvolnum></citerefentry> file) and a GSSAPI interposer plugin
+            (<citerefentry><refentrytitle>gssproxy-mech</refentrytitle><manvolnum>8</manvolnum>
+            </citerefentry>).
+        </para>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>OPTIONS</title>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>-D</option>,<option>--daemon</option>
+                </term>
+                <listitem>
+                    <para>
+                        Become a daemon after starting up.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>-c</option>,<option>--config</option>
+                </term>
+                <listitem>
+                    <para>
+                        Specify a config file to use as the main config file
+                        (read before the rest of the config directory).  The
+                        default is to use the file
+                        <filename>/etc/gssproxy/gssproxy.conf</filename>.
+                        For reference on the config file syntax and options,
+                        consult the
+                        <citerefentry>
+                            <refentrytitle>gssproxy.conf</refentrytitle>
+                            <manvolnum>5</manvolnum>
+                        </citerefentry>
+                        manual page.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>-C</option>,<option>--configdir</option>
+                </term>
+                <listitem>
+                    <para>
+                        Specify a non-default config dir.  Files named of the
+                        form "##-foo.conf" (that is, beginning with two digits
+                        and a dash, and ending in ".conf") will be read in
+                        numeric order from this directory, in addition to the
+                        config file itself.  The default is
+                        <filename>/etc/gssproxy</filename>. For reference on
+                        the config file syntax and options, consult the
+                        <citerefentry>
+                            <refentrytitle>gssproxy.conf</refentrytitle>
+                            <manvolnum>5</manvolnum>
+                        </citerefentry>
+                        manual page.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>-d</option>,<option>--debug</option>
+                </term>
+                <listitem>
+                    <para>
+                        Turn on debugging.  This option is identical to
+                        --debug-level=1.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>--debug-level=</option>
+                </term>
+                <listitem>
+                    <para>
+                        Turn on debugging at the specified level.  0
+                        corresponds to no logging, while 1 turns on basic
+                        debug logging.  Level 2 increases verbosity, including
+                        more detailed credential verification.
+                    </para>
+                    <para>
+                        At level 3 and above, KRB5_TRACE output is logged.  If
+                        KRB5_TRACE was already set in the execution
+                        environment, trace output is sent to its value
+                        instead.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>-i</option>,<option>--interactive</option>
+                </term>
+                <listitem>
+                    <para>
+                        Run in the foreground, don't become a daemon.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>-u</option>,<option>--userproxy</option>
+                </term>
+                <listitem>
+                    <para>
+                        Run gssproxy in userproxy mode. This mode ignores
+                        configuration files, and listens on a socket in
+                        $XDG_RUNTIME_DIR/gssproxy/default.sock instead.
+                        See the project documentation for more information
+                        on the behavior of this mode.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>-s</option>,<option>--socket</option>
+                </term>
+                <listitem>
+                    <para>
+                        Specify a custom default socket name. This socket will be used
+                        by all sections that do not define an explicit socket.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>--syslog-status</option>
+                </term>
+                <listitem>
+                    <para>Enable additional logging to syslog.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>--version</option>
+                </term>
+                <listitem>
+                    <para>
+                        Print version number and exit.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1>
+        <title>Signals</title>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>SIGTERM/SIGINT</term>
+                <listitem>
+                    <para>
+                        Informs the GssProxy to gracefully terminate all of its
+                        child processes and then shut down.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>SIGHUP</term>
+                <listitem>
+                    <para>
+                        Request a reload of all configuration for gssproxy.
+                        If there is an error in the configuration files, the
+                        existing configuration will not be replaced; if there
+                        is a problem applying the new configuration, gssproxy
+                        will exit.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='see_also'>
+        <title>SEE ALSO</title>
+        <para>
+            <citerefentry>
+                <refentrytitle>gssproxy.conf</refentrytitle><manvolnum>5</manvolnum>
+            </citerefentry> and
+            <citerefentry>
+                <refentrytitle>gssproxy-mech</refentrytitle><manvolnum>8</manvolnum>
+            </citerefentry>.
+        </para>
+    </refsect1>
+</refentry>
+</reference>

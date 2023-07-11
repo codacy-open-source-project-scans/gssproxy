@@ -1,0 +1,46 @@
+First off, run:
+$ autoreconf -f -i
+
+Then the usual $ ./configure # and $ make #
+
+In order to build gss-proxy the following development packages are needed
+additionally to a ISO C compiler:
+
+    autoconf
+    automake
+    docbook-style-xsl
+    doxygen
+    findutils
+    gettext-devel
+    libini_config-devel
+    keyutils-libs-devel
+    krb5-devel
+    libselinux-devel
+    libtool
+    libverto-devel
+    libxml2
+    libxslt
+    m4
+    make
+    pkgconfig
+    popt-devel
+
+For testing via $ make tests # you additionally need these packages:
+
+    krb5-server
+    krb5-server-ldap
+    krb5-workstation
+    nss_wrapper
+    openldap-clients
+    openldap-servers
+    socket_wrapper
+    valgrind
+
+NOTE: The minimum supported Kerberos version is MIT Kerberos 1.14 as it
+includes [1] for Microsoft interoperability.  gssproxy relies on the
+interposer mechanism [1] and so there is no version of gssproxy which will
+work before 1.11.  Various other features require newer versions of MIT krb5;
+patch out at your own risk.
+
+[1] https://github.com/krb5/krb5/commit/7e6965ae33338216650384ca559d49e90312087a
+[2] http://k5wiki.kerberos.org/wiki/Projects/Interposer_Mechanism
