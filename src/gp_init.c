@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #ifdef HAVE_CAP
 
@@ -260,10 +261,19 @@ static void hup_handler(verto_ctx *vctx UNUSED, verto_ev *ev)
 
     gpctx = verto_get_private(ev);
 
+    sd_notifyf(0, "RELOADING=1\n"
+               "MONOTONIC_USEC=%" PRIu64 "\n"
+               "STATUS=Reloading configuration\n",
+               time_now_usec());
+
     GPDEBUG("Received SIGHUP; re-reading config.\n");
     new_config = read_config(gpctx->config_file, gpctx->config_dir,
                              gpctx->config_socket, gpctx->daemonize);
     if (!new_config) {
+        sd_notifyf(0, "READY=1\n"
+                   "STATUS=Running, %i service(s) configured"
+                   " (failed to re-read config)\n",
+                   gpctx->config->num_svcs);
         GPERROR("Error reading new configuration on SIGHUP; keeping old "
                 "configuration instead!\n");
         return;
@@ -277,16 +287,20 @@ static void hup_handler(verto_ctx *vctx UNUSED, verto_ev *ev)
     }
 
     /* conditionally reload kernel interface */
-    init_proc_nfsd(gpctx->config);
+    init_proc_nfsd(gpctx);
 
     free_config(&old_config);
 
+    sd_notifyf(0, "READY=1\n"
+               "STATUS=Running, %i service(s) configured\n",
+               gpctx->config->num_svcs);
     GPDEBUG("New config loaded successfully.\n");
     return;
 }
 
 static void break_loop(verto_ctx *vctx, verto_ev *ev UNUSED)
 {
+    sd_notifyf(0, "STOPPING=1\nSTATUS=Signal received, stopping\n");
     GPDEBUG("Exiting after receiving a signal\n");
     verto_break(vctx);
 }
@@ -354,11 +368,14 @@ fail:
  * is done. */
 static void delayed_init(verto_ctx *vctx UNUSED, verto_ev *ev)
 {
-    struct gssproxy_ctx *gpctx;
+    struct gssproxy_ctx *gpctx = verto_get_private(ev);
+
+    sd_notifyf(0, "READY=1\n"
+	       "STATUS=Running, %i service(s) configured\n",
+	       gpctx->config->num_svcs);
 
     GPDEBUG("Initialization complete.\n");
 
-    gpctx = verto_get_private(ev);
     idle_handler(gpctx);
 }
 
@@ -376,31 +393,28 @@ int init_event_fini(struct gssproxy_ctx *gpctx)
     return 0;
 }
 
-void init_proc_nfsd(struct gp_config *cfg)
+static int try_init_proc_nfsd(void)
 {
     char buf[] = "1";
-    bool enabled = false;
-    int fd, ret;
-    static int poked = 0;
+    static bool poked = false;
+    static bool warned_once = false;
+    int fd = 1;
+    int ret;
 
-    /* check first if any service enabled kernel support */
-    for (int i = 0; i < cfg->num_svcs; i++) {
-        if (cfg->svcs[i]->kernel_nfsd) {
-            enabled = true;
-            break;
-        }
-    }
-
-    if (!enabled || poked) {
-        return;
+    if (poked) {
+        return 0;
     }
 
     fd = open(LINUX_PROC_USE_GSS_PROXY_FILE, O_RDWR);
     if (fd == -1) {
         ret = errno;
-        GPDEBUG("Kernel doesn't support GSS-Proxy (can't open %s: %d (%s))\n",
-                LINUX_PROC_USE_GSS_PROXY_FILE, ret, gp_strerror(ret));
-        goto fail;
+        if (!warned_once) {
+            GPDEBUG("Kernel doesn't support GSS-Proxy "
+                    "(can't open %s: %d (%s))\n",
+                    LINUX_PROC_USE_GSS_PROXY_FILE, ret, gp_strerror(ret));
+            warned_once = true;
+        }
+        goto out;
     }
 
     ret = write(fd, buf, 1);
@@ -408,15 +422,76 @@ void init_proc_nfsd(struct gp_config *cfg)
         ret = errno;
         GPDEBUG("Failed to write to %s: %d (%s)\n",
                 LINUX_PROC_USE_GSS_PROXY_FILE, ret, gp_strerror(ret));
-        close(fd);
-        goto fail;
+        goto out;
     }
 
-    poked = 1;
-    close(fd);
-    return;
-fail:
-    GPDEBUG("Problem with kernel communication!  NFS server will not work\n");
+    GPDEBUG("Kernel GSS-Proxy support enabled\n");
+    poked = true;
+    ret = 0;
+
+out:
+    if (fd != -1) {
+        close(fd);
+    }
+    return ret;
+}
+
+static void delayed_proc_nfsd(verto_ctx *vctx UNUSED, verto_ev *ev)
+{
+    struct gssproxy_ctx *gpctx;
+    int ret;
+
+    gpctx = verto_get_private(ev);
+
+    ret = try_init_proc_nfsd();
+    if (ret == 0) {
+        verto_del(gpctx->retry_proc_ev);
+        gpctx->retry_proc_ev = NULL;
+    }
+}
+
+int init_proc_nfsd(struct gssproxy_ctx *gpctx)
+{
+    bool enabled = false;
+    int ret;
+
+    /* check first if any service enabled kernel support */
+    for (int i = 0; i < gpctx->config->num_svcs; i++) {
+        if (gpctx->config->svcs[i]->kernel_nfsd) {
+            enabled = true;
+            break;
+        }
+    }
+
+    if (!enabled) {
+        goto out;
+    }
+
+    ret = try_init_proc_nfsd();
+    if (ret == 0) {
+        goto out;
+    }
+
+    /* failure, but the auth_rpcgss module might not be loaded yet */
+    if (!gpctx->retry_proc_ev) {
+        gpctx->retry_proc_ev = verto_add_timeout(gpctx->vctx,
+                                                 VERTO_EV_FLAG_PERSIST,
+                                                 delayed_proc_nfsd, 10 * 1000);
+        if (!gpctx->retry_proc_ev) {
+            fprintf(stderr, "Failed to register delayed_proc_nfsd event!\n");
+        } else {
+            verto_set_private(gpctx->retry_proc_ev, gpctx, NULL);
+        }
+    }
+
+    return 1;
+
+out:
+    if (gpctx->retry_proc_ev) {
+        verto_del(gpctx->retry_proc_ev);
+        gpctx->retry_proc_ev = NULL;
+    }
+    return 0;
 }
 
 void write_pid(void)
